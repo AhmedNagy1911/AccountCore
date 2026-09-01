@@ -1,3 +1,6 @@
 <Solution>
   <Project Path="AccountCore.API/AccountCore.API.csproj" />
+  <Project Path="AccountCore.Application/AccountCore.Application.csproj" />
+  <Project Path="AccountCore.Domain/AccountCore.Domain.csproj" />
+  <Project Path="AccountCore.Infrastructure/AccountCore.Infrastructure.csproj" />
 </Solution>
