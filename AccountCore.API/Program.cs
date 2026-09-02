@@ -1,5 +1,7 @@
 using AccountCore.API.Exceptions;
 using AccountCore.API.Swagger;
+using AccountCore.Application;
+using AccountCore.Infrastructure;
 using Asp.Versioning;
 using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -9,6 +11,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+
+// Register Application and Infrastructure services
+builder.Services
+        .AddInfrastructure(builder.Configuration)
+        .AddApplication();
 
 // Exception Handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
