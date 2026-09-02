@@ -1,3 +1,4 @@
+using AccountCore.API.Exceptions;
 using AccountCore.API.Swagger;
 using Asp.Versioning;
 using Microsoft.Extensions.Options;
@@ -8,6 +9,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+
+// Exception Handler
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 // Add Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -56,6 +61,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+
+app.UseExceptionHandler();
 
 app.MapControllers();
 
