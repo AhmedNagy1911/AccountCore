@@ -1,4 +1,7 @@
-﻿using AccountCore.Infrastructure.Persistence;
+﻿using AccountCore.Application.Interfaces;
+using AccountCore.Infrastructure.Options;
+using AccountCore.Infrastructure.Persistence;
+using AccountCore.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +19,17 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(connectionString));
+
+
+        services.AddScoped<IJwtProvider, JwtProvider>();
+
+        //Add Options Pattern
+        services.AddOptions<JwtOptions>()
+            .BindConfiguration(JwtOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddHttpContextAccessor();
 
         return services;
     }
