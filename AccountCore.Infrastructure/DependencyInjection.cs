@@ -2,6 +2,7 @@
 using AccountCore.Infrastructure.Options;
 using AccountCore.Infrastructure.Persistence;
 using AccountCore.Infrastructure.Services;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,10 +23,17 @@ public static class DependencyInjection
 
 
         services.AddScoped<IJwtProvider, JwtProvider>();
+        services.AddScoped<IEmailSender, EmailService>();
 
         //Add Options Pattern
         services.AddOptions<JwtOptions>()
             .BindConfiguration(JwtOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+
+        services.AddOptions<MailSettings>()
+            .BindConfiguration(nameof(MailSettings))
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
