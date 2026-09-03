@@ -3,6 +3,8 @@ using AccountCore.API.Swagger;
 using AccountCore.Application;
 using AccountCore.Infrastructure;
 using Asp.Versioning;
+using Hangfire;
+using HangfireBasicAuthenticationFilter;
 using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
@@ -66,6 +68,21 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Add Hangfire Configurations And Protect Hangfire Dashboard
+app.UseHangfireDashboard("/jobs", new DashboardOptions
+{
+    Authorization =
+    [
+        new HangfireCustomBasicAuthenticationFilter
+        {
+            User = app.Configuration.GetValue<string>("HangfireSettings:Username"),
+            Pass = app.Configuration.GetValue<string>("HangfireSettings:Password")
+        }
+    ],
+    DashboardTitle = "Voice Pulse Dashboard",
+    //IsReadOnlyFunc = (DashboardContext conext) => true
+});
 
 app.UseAuthorization();
 
