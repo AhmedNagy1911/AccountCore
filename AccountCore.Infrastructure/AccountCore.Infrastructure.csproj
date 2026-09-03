@@ -20,10 +20,18 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
-
+	
+<ItemGroup>
+	<Content Include="Templates\**\*.html" Link="Templates\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
+	
   <ItemGroup>
     <ProjectReference Include="..\AccountCore.Application\AccountCore.Application.csproj" />
     <ProjectReference Include="..\AccountCore.Domain\AccountCore.Domain.csproj" />
+  </ItemGroup>
+	
+  <ItemGroup>
+    <Folder Include="Templates\" />
   </ItemGroup>
 
 </Project>

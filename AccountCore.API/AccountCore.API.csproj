@@ -23,7 +23,11 @@
     </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
-
+	
+<ItemGroup>
+	<Content Include="..\AccountCore.Infrastructure\Templates\**\*.html" Link="Templates\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
+	
   <ItemGroup>
     <ProjectReference Include="..\AccountCore.Application\AccountCore.Application.csproj" />
     <ProjectReference Include="..\AccountCore.Infrastructure\AccountCore.Infrastructure.csproj" />
