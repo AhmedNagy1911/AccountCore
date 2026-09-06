@@ -35,7 +35,6 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
 
-
 // Add Api Versioning
 builder.Services.AddApiVersioning(options =>
 {
@@ -104,6 +103,7 @@ app.UseHangfireDashboard("/jobs", new DashboardOptions
     //IsReadOnlyFunc = (DashboardContext conext) => true
 });
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseExceptionHandler();
