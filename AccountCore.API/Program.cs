@@ -6,6 +6,7 @@ using Asp.Versioning;
 using Hangfire;
 using HangfireBasicAuthenticationFilter;
 using Microsoft.Extensions.Options;
+using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
 
@@ -62,6 +63,11 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Configure application logging with Serilog
+builder.Host.UseSerilog((context, configuration) =>
+    configuration.ReadFrom.Configuration(context.Configuration)
+);
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -78,6 +84,8 @@ if (app.Environment.IsDevelopment())
     }
     );
 }
+
+app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
 
