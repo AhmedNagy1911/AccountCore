@@ -1,4 +1,4 @@
-﻿
+﻿using AccountCore.API.Extensions;
 using AccountCore.Application.Contracts.Authentication;
 using AccountCore.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +19,5 @@ public class AuthController(IAuthService authService, ILogger<AuthController> lo
 
         return result.IsSuccess ? Ok() : result.ToProblem();
     }
-
 
 }
