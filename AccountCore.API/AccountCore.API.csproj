@@ -33,8 +33,4 @@
     <ProjectReference Include="..\AccountCore.Infrastructure\AccountCore.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Controllers\" />
-  </ItemGroup>
-
 </Project>
