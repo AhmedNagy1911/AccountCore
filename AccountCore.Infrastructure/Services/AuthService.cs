@@ -4,6 +4,7 @@ using AccountCore.Application.Contracts.Authentication;
 using AccountCore.Application.Interfaces;
 using AccountCore.Domain.Entities;
 using AccountCore.Infrastructure.Helpers;
+using AccountCore.Infrastructure.Persistence;
 using Hangfire;
 using Mapster;
 using Microsoft.AspNetCore.Http;
@@ -12,37 +13,96 @@ using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace AccountCore.Infrastructure.Services;
 
 public class AuthService(
-    UserManager<ApplicationUser> usermanager,
-    ILogger<AuthService> logger,
-    IHttpContextAccessor httpContextAccessor,
-     IEmailSender emailSender) : IAuthService
+      UserManager<ApplicationUser> userManager,
+      IJwtProvider jwtProvider,
+      SignInManager<ApplicationUser> signInManager,
+      ILogger<AuthService> logger,
+      IEmailSender emailSender,
+      IHttpContextAccessor httpContextAccessor,
+      ApplicationDbContext context) : IAuthService
 {
-    private readonly UserManager<ApplicationUser> _usermanager = usermanager;
+    private readonly UserManager<ApplicationUser> _userManager = userManager;
+    private readonly IJwtProvider _jwtProvider = jwtProvider;
+    private readonly SignInManager<ApplicationUser> _signInManager = signInManager;
     private readonly ILogger<AuthService> _logger = logger;
-    private readonly IHttpContextAccessor _httpcontextaccessor = httpContextAccessor;
-    private readonly IEmailSender _emailsender = emailSender;
+    private readonly IEmailSender _emailSender = emailSender;
+    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+    private readonly ApplicationDbContext _context = context;
+
+    private readonly int _refreshTokenEpiryDays = 14;
+
+    public async Task<Result<AuthResponse>> GetTokenAsync(string email, string password, CancellationToken cancellationToken = default)
+    {
+        //chech user?
+        var user = await _userManager.FindByEmailAsync(email);
+
+        if (user is null)
+            return Result.Failure<AuthResponse>(UserErrors.InvalidCredentials);
+
+        if (user.IsDisabled)
+            return Result.Failure<AuthResponse>(UserErrors.DisabledUser);
+
+        //chech password and confirm email
+        var result = await _signInManager.PasswordSignInAsync(user, password, false, true);
+
+        if (result.Succeeded)
+        {
+
+            var userRoles = await GetUserRolesAndPermissions(user, cancellationToken);
+
+            //generate JWT token
+            var (token, expiresIn) = _jwtProvider.GenerateToken(user, userRoles);
+
+            // Add RefreshToken
+            var refreshToken = GenerateRefreshToken();
+            var refreshTokenExpiration = DateTime.UtcNow.AddDays(_refreshTokenEpiryDays);
+
+            user.RefreshTokens.Add(new RefreshToken
+            {
+                Token = refreshToken,
+                ExpiresOn = refreshTokenExpiration
+            });
+
+            await _userManager.UpdateAsync(user);
+
+            //Return New AuthResponse() 
+            var response = new AuthResponse(user.Id, user.Email, user.PhoneNumber!, user.UserName!, user.FirstName, user.LastName, token, expiresIn, refreshToken, refreshTokenExpiration);
+
+            return Result.Success(response);
+        }
+
+        var error = result.IsNotAllowed
+            ? UserErrors.EmailNotConfirmed
+            : result.IsLockedOut
+            ? UserErrors.LockedUser
+            : UserErrors.InvalidCredentials;
+
+        return Result.Failure<AuthResponse>(error);
+
+    }
 
     public async Task<Result> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
-        var emailIsExists = await _usermanager.Users.AnyAsync(x => x.Email == request.Email, cancellationToken);
+        var emailIsExists = await _userManager.Users.AnyAsync(x => x.Email == request.Email, cancellationToken);
 
         if (emailIsExists)
             return Result.Failure(UserErrors.DuplicatedEmail);
 
         var user = request.Adapt<ApplicationUser>();
 
-        var result = await _usermanager.CreateAsync(user, request.Password);
+        var result = await _userManager.CreateAsync(user, request.Password);
 
 
         if (result.Succeeded)
         {
             // Generate Verification Code
-            var code = await _usermanager.GenerateEmailConfirmationTokenAsync(user);
+            var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
             _logger.LogInformation("Confirmation code: {code}", code);
@@ -57,10 +117,13 @@ public class AuthService(
 
         return Result.Failure(new Error(error.Code, error.Description, StatusCodes.Status400BadRequest));
     }
-
+    private static string GenerateRefreshToken()
+    {
+        return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+    }
     private async Task SendConfirmationEmail(ApplicationUser user, string code)
     {
-        var origin = _httpcontextaccessor.HttpContext?.Request.Headers.Origin;
+        var origin = _httpContextAccessor.HttpContext?.Request.Headers.Origin;
 
         var emailBody = EmailBodyBuilder.GenerateEmailBody("EmailConfirmation",
             templateModel: new Dictionary<string, string>
@@ -70,6 +133,11 @@ public class AuthService(
             }
         );
 
-        BackgroundJob.Enqueue(() => _emailsender.SendEmailAsync(user.Email!, "✅  Voice Pulse: Email Confirmation", emailBody));
+        BackgroundJob.Enqueue(() => _emailSender.SendEmailAsync(user.Email!, "✅  Voice Pulse: Email Confirmation", emailBody));
+    }
+
+    private async Task<IEnumerable<string>> GetUserRolesAndPermissions(ApplicationUser user, CancellationToken cancellationToken)
+    {
+        return await _userManager.GetRolesAsync(user);
     }
 }
