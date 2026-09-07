@@ -37,6 +37,37 @@ public class AuthService(
 
     private readonly int _refreshTokenEpiryDays = 14;
 
+    public async Task<Result> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    {
+        var emailIsExists = await _userManager.Users.AnyAsync(x => x.Email == request.Email, cancellationToken);
+
+        if (emailIsExists)
+            return Result.Failure(UserErrors.DuplicatedEmail);
+
+        var user = request.Adapt<ApplicationUser>();
+
+        var result = await _userManager.CreateAsync(user, request.Password);
+
+
+        if (result.Succeeded)
+        {
+            // Generate Verification Code
+            var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+
+            _logger.LogInformation("Confirmation code: {code}", code);
+
+            // send email
+            await SendConfirmationEmail(user, code);
+
+            return Result.Success();
+        }
+
+        var error = result.Errors.First();
+
+        return Result.Failure(new Error(error.Code, error.Description, StatusCodes.Status400BadRequest));
+    }
+   
     public async Task<Result<AuthResponse>> GetTokenAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         //chech user?
@@ -54,7 +85,7 @@ public class AuthService(
         if (result.Succeeded)
         {
 
-            var userRoles = await GetUserRolesAndPermissions(user, cancellationToken);
+            var userRoles = await GetUserRoles(user, cancellationToken);
 
             //generate JWT token
             var (token, expiresIn) = _jwtProvider.GenerateToken(user, userRoles);
@@ -87,36 +118,58 @@ public class AuthService(
 
     }
 
-    public async Task<Result> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<AuthResponse>> GetRefreshTokenAsync(string token, string refreshToken, CancellationToken cancellationToken = default)
     {
-        var emailIsExists = await _userManager.Users.AnyAsync(x => x.Email == request.Email, cancellationToken);
+        //chech userid? 
+        var userId = _jwtProvider.ValidateToken(token);
 
-        if (emailIsExists)
-            return Result.Failure(UserErrors.DuplicatedEmail);
+        if (userId is null)
+            return Result.Failure<AuthResponse>(UserErrors.InvalidJwtToken);
 
-        var user = request.Adapt<ApplicationUser>();
+        ////chech user?
+        var user = await _userManager.FindByIdAsync(userId);
 
-        var result = await _userManager.CreateAsync(user, request.Password);
+        if (user is null)
+            return Result.Failure<AuthResponse>(UserErrors.InvalidJwtToken);
 
+        if (user.IsDisabled)
+            return Result.Failure<AuthResponse>(UserErrors.DisabledUser);
 
-        if (result.Succeeded)
+        if (user.LockoutEnd > DateTime.UtcNow)
+            return Result.Failure<AuthResponse>(UserErrors.LockedUser);
+
+        //chech token?
+        var userRefreshToken = user.RefreshTokens.SingleOrDefault(x => x.Token == refreshToken && x.IsActive);
+
+        if (userRefreshToken is null)
+            return Result.Failure<AuthResponse>(UserErrors.InvalidRefreshToken);
+
+        //remove old token
+        userRefreshToken.RevokedOn = DateTime.UtcNow;
+
+        var userRoles = await GetUserRoles(user, cancellationToken);
+
+        //generate JWT NewToken
+        var (newToken, expiresIn) = _jwtProvider.GenerateToken(user, userRoles);
+
+        // Add NewRefreshToken
+        var newRefreshToken = GenerateRefreshToken();
+        var refreshTokenExpiration = DateTime.UtcNow.AddDays(_refreshTokenEpiryDays);
+
+        user.RefreshTokens.Add(new RefreshToken
         {
-            // Generate Verification Code
-            var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+            Token = newRefreshToken,
+            ExpiresOn = refreshTokenExpiration
+        });
 
-            _logger.LogInformation("Confirmation code: {code}", code);
+        await _userManager.UpdateAsync(user);
 
-            // send email
-            await SendConfirmationEmail(user, code);
+        //Return New AuthResponse() 
+        var response = new AuthResponse(user.Id, user.Email, user.PhoneNumber!, user.UserName!, user.FirstName, user.LastName, newToken, expiresIn, newRefreshToken, refreshTokenExpiration);
 
-            return Result.Success();
-        }
-
-        var error = result.Errors.First();
-
-        return Result.Failure(new Error(error.Code, error.Description, StatusCodes.Status400BadRequest));
+        return Result.Success(response);
     }
+
     private static string GenerateRefreshToken()
     {
         return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
@@ -129,14 +182,14 @@ public class AuthService(
             templateModel: new Dictionary<string, string>
             {
                 { "{{name}}", user.FirstName },
-                    { "{{action_url}}", $"{origin}/auth/emailConfirmation?userId={user.Id}&code={code}" }
+                { "{{action_url}}", $"{origin}/auth/emailConfirmation?userId={user.Id}&code={code}" }
             }
         );
 
         BackgroundJob.Enqueue(() => _emailSender.SendEmailAsync(user.Email!, "✅  Voice Pulse: Email Confirmation", emailBody));
     }
 
-    private async Task<IEnumerable<string>> GetUserRolesAndPermissions(ApplicationUser user, CancellationToken cancellationToken)
+    private async Task<IEnumerable<string>> GetUserRoles(ApplicationUser user, CancellationToken cancellationToken)
     {
         return await _userManager.GetRolesAsync(user);
     }
