@@ -1,6 +1,7 @@
 ﻿using AccountCore.API.Extensions;
 using AccountCore.Application.Contracts.Authentication;
 using AccountCore.Application.Interfaces;
+using AccountCore.Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AccountCore.API.Controllers;
@@ -42,4 +43,13 @@ public class AuthController(IAuthService authService, ILogger<AuthController> lo
             : authResult.ToProblem();
     }
 
+    [HttpPost("revoke-refresh-token")]
+    public async Task<IActionResult> RevokeRefreshToken([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken = default)
+    {
+        var result = await _authService.RevokeRefreshTokenAsync(request.Token, request.RefreshToken, cancellationToken);
+
+        return result.IsSuccess
+            ? Ok()
+            : result.ToProblem();
+    }
 }
