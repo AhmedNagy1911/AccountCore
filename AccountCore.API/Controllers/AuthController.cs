@@ -75,4 +75,12 @@ public class AuthController(IAuthService authService, ILogger<AuthController> lo
 
         return result.IsSuccess ? Ok() : result.ToProblem();
     }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        var result = await _authService.ResetPasswordAsync(request);
+
+        return result.IsSuccess ? Ok() : result.ToProblem();
+    }
 }
