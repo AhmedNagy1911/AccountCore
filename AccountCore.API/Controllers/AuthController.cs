@@ -1,7 +1,6 @@
 ﻿using AccountCore.API.Extensions;
 using AccountCore.Application.Contracts.Authentication;
 using AccountCore.Application.Interfaces;
-using AccountCore.Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AccountCore.API.Controllers;
@@ -57,6 +56,14 @@ public class AuthController(IAuthService authService, ILogger<AuthController> lo
     public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailRequest request, CancellationToken cancellationToken)
     {
         var result = await _authService.ConfirmEmailAsync(request);
+
+        return result.IsSuccess ? Ok() : result.ToProblem();
+    }
+
+    [HttpPost("resend-confirmation-email")]
+    public async Task<IActionResult> ResendConfirmationEmail([FromBody] ResendConfirmationEmailRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _authService.ResendConfirmationEmailAsync(request);
 
         return result.IsSuccess ? Ok() : result.ToProblem();
     }
