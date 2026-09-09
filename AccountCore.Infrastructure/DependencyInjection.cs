@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtProvider, JwtProvider>();
         services.AddScoped<IEmailSender, EmailService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IRoleService, RoleService>();
 
         //Add Options Pattern
         services.AddOptions<JwtOptions>()
